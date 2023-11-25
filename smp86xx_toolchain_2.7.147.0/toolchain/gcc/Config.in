@@ -1,0 +1,48 @@
+# Choose gcc version.
+# WARNING -- 2.95 currently only builds for i386, arm, mips*, and powerpc.
+# WARNING -- 2.95 does not currently build natively for the target.
+
+comment "Gcc Options"
+
+config BR2_GCC_VERSION_3_4_2
+	bool
+#	"gcc 3.4.2"
+	default y
+
+config BR2_GCC_VERSION
+	string
+	default "3.4.2"     if BR2_GCC_VERSION_3_4_2
+
+
+config BR2_GCC_USE_SJLJ_EXCEPTIONS
+	string
+	default "--enable-sjlj-exceptions"
+	help
+	    Currently the unwind stuff seems to work for staticly linked apps
+	    but not dynamic.  So use setjmp/longjmp exceptions by default.
+
+config BR2_EXTRA_GCC_CONFIG_OPTIONS
+	string "Additional gcc options"
+	default ""
+	help
+	    Any additional gcc options you may want to include....
+
+config BR2_INSTALL_LIBSTDCPP
+	bool
+	default y
+	help
+	    Build/install c++ compiler and libstdc++?
+
+config BR2_INSTALL_LIBGCJ
+	bool
+	default n
+	depends on BR2_INSTALL_LIBSTDCPP
+	help
+	    Build/install java compiler and libgcj?
+
+config BR2_INSTALL_OBJC
+	bool
+	default n
+	help
+	    Build/install Objective-C compiler and runtime?
+

@@ -1,0 +1,13 @@
+menu "Toolchain Options"
+
+comment "Common Toolchain Options"
+
+config BR2_TARGET_OPTIMIZATION
+	string "Target Optimizations"
+	default "-Os -pipe"
+	help
+	  Optimizations to use when building for the target host.
+
+endmenu
+
+source "toolchain/kernel-headers/Config.in"

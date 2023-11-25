@@ -1,0 +1,12 @@
+diff -urN uClibc-0.9.27/Rules.mak uClibc-0.9.27.NEW/Rules.mak
+--- uClibc-0.9.27/Rules.mak	2005-03-29 20:31:00.000000000 -0800
++++ uClibc-0.9.27.NEW/Rules.mak	2005-03-29 12:11:55.000000000 -0800
+@@ -285,7 +285,7 @@
+     CFLAGS += $(PICFLAG)
+ endif
+ 
+-ASFLAGS = $(CFLAGS)
++ASFLAGS = $(CFLAGS) -D__ASSEMBLY__
+ ifeq ($(UCLIBC_BUILD_NOEXECSTACK),y)
+ check_as_noexecstack=$(shell if $(LD) --help | grep -q "z noexecstack"; then echo "-Wa,--noexecstack"; fi)
+ ASFLAGS += $(check_as_noexecstack)

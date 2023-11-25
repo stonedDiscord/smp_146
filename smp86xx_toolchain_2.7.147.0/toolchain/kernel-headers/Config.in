@@ -1,0 +1,15 @@
+# Choose the kernel headers to use for kernel-headers target. This is
+# ignored if you are building your own kernel or using the system kernel.
+#
+
+comment "Kernel Header Options"
+
+config BR2_KERNEL_HEADERS_2_4_29
+	bool
+#	"Linux 2.4.29 kernel headers"
+	default y
+
+config BR2_DEFAULT_KERNEL_HEADERS
+	string
+	default "2.4.29"	if BR2_KERNEL_HEADERS_2_4_29
+

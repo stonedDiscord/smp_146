@@ -1,0 +1,12 @@
+# Choose binutils version.
+
+comment "Binutils Options"
+
+config BR2_BINUTILS_VERSION_2_15_91_0_2
+	bool
+#	"binutils 2.15.91.0.2"
+	default y
+
+config BR2_BINUTILS_VERSION
+	string
+	default "2.15.91.0.2"     if BR2_BINUTILS_VERSION_2_15_91_0_2

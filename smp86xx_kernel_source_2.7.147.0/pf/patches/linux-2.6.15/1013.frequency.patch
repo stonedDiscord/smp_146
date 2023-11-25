@@ -1,0 +1,215 @@
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin --exclude=yamon-02.06-SIGMADESIGNS-01_el.bin linux-2.6.15.ref/arch/mips/kernel/time.c linux-2.6.15/arch/mips/kernel/time.c
+--- linux-2.6.15.ref/arch/mips/kernel/time.c	2006-11-06 13:42:03.000000000 -0800
++++ linux-2.6.15/arch/mips/kernel/time.c	2006-11-06 13:43:45.000000000 -0800
+@@ -44,6 +44,14 @@
+ #include <asm/tango3/emhwlib_registers_tango3.h>
+ #endif
+ 
++#ifdef CONFIG_TANGOX
++static void reset_timer(unsigned long cpu, unsigned long sys);
++extern unsigned long tangox_get_cpuclock(void);
++extern unsigned long tangox_get_sysclock(void);
++extern unsigned long em8xxx_cpu_frequency;
++extern unsigned long em8xxx_sys_frequency;
++#endif
++
+ /*
+  * The integer part of the number of usecs per jiffy is taken from tick,
+  * but the fractional part is not recorded, so we calculate it using the
+@@ -434,10 +442,17 @@
+ 	unsigned int count;
+ 
+ #ifdef CONFIG_TANGOX
++	unsigned long cpu_frequency = tangox_get_cpuclock();
++	unsigned long sys_frequency = tangox_get_sysclock();
++
+ 	if ((jiffies % HZ) == 0) { /* Update CPU heart beat conunter per second */
+ 		gbus_write_uint32(pGBus, REG_BASE_cpu_block + LR_HB_CPU, 
+ 				gbus_read_uint32(pGBus, REG_BASE_cpu_block + LR_HB_CPU) + 1);
+ 	}
++	if ((cpu_frequency != em8xxx_cpu_frequency) || (sys_frequency != em8xxx_sys_frequency)) {
++		/* Detected CPU/System frequency change */
++		reset_timer(cpu_frequency, sys_frequency);
++	}
+ #endif
+ 
+ 	count = mips_hpt_read();
+@@ -793,3 +808,35 @@
+ {
+ 	return (unsigned long long)jiffies*(1000000000/HZ);
+ }
++
++#ifdef CONFIG_TANGOX
++/* Called after PLL has been reset */
++static void reset_timer(unsigned long cpu_freq, unsigned long sys_freq)
++{
++#ifndef CONFIG_TANGOX_USE_CPU_CLOCK
++	extern void reset_cpu_timer0(void);
++#endif
++	em8xxx_cpu_frequency = cpu_freq;
++	em8xxx_sys_frequency = sys_freq;
++
++	mips_hpt_frequency = em8xxx_cpu_frequency / 2;
++
++	/* Calculate cache parameters.  */
++	cycles_per_jiffy = (mips_hpt_frequency + HZ / 2) / HZ;
++
++#ifndef CONFIG_TANGOX_USE_CPU_CLOCK
++	reset_cpu_timer0();
++#else
++	/* sll32_usecs_per_cycle = 10^6 * 2^32 / mips_counter_freq  */
++	do_div64_32(sll32_usecs_per_cycle,
++			1000000, mips_hpt_frequency / 2,
++			mips_hpt_frequency);
++#endif
++
++	/* Report the high precision timer rate for a reference.  */
++	printk("Using %u.%03u MHz high precision timer.\n",
++			((mips_hpt_frequency + 500) / 1000) / 1000,
++			((mips_hpt_frequency + 500) / 1000) % 1000);
++}
++#endif /* CONFIG_TANGOX */
++
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin --exclude=yamon-02.06-SIGMADESIGNS-01_el.bin linux-2.6.15.ref/arch/mips/tangox/Kconfig linux-2.6.15/arch/mips/tangox/Kconfig
+--- linux-2.6.15.ref/arch/mips/tangox/Kconfig	2006-11-06 13:42:03.000000000 -0800
++++ linux-2.6.15/arch/mips/tangox/Kconfig	2006-11-06 13:43:52.000000000 -0800
+@@ -130,6 +130,15 @@
+ 	help
+ 	 System frequency.
+ 
++config TANGOX_FREQUENCY_SCALING
++	bool "Enable frequency scaling mechanism"
++	depends on TANGO2_SMP863X || TANGO3_SMP864X
++	default y
++	help
++	 If you say yes here, CPU/System frequency scaling mechanism will
++	 be put in place, so user level application will be able to change 
++	 the frequencies as well as the ratio.
++
+ config TANGOX_USE_CPU_CLOCK
+ 	bool "Use internal cpu clock for system timer"
+ 	depends on TANGO2_SMP863X || TANGO3_SMP864X
+@@ -293,3 +302,10 @@
+ 	default n
+ 
+ endmenu
++
++menu "CPU Frequency scaling"
++	depends on TANGOX_FREQUENCY_SCALING
++
++source "drivers/cpufreq/Kconfig"
++
++endmenu
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin --exclude=yamon-02.06-SIGMADESIGNS-01_el.bin linux-2.6.15.ref/arch/mips/tangox/setup.c linux-2.6.15/arch/mips/tangox/setup.c
+--- linux-2.6.15.ref/arch/mips/tangox/setup.c	2006-11-06 13:42:05.000000000 -0800
++++ linux-2.6.15/arch/mips/tangox/setup.c	2006-11-06 13:43:45.000000000 -0800
+@@ -234,6 +234,18 @@
+ 	gbus_writel(REG_BASE_cpu_block + CPU_time0_clr, 1);
+ }
+ 
++#ifndef CONFIG_TANGOX_USE_CPU_CLOCK
++void reset_cpu_timer0(void)
++{
++	/* CPU_time0_load  register contains  just  16-bits value  So,
++	   take cate not the value to overflow */
++	WR_CPU_REG32(CPU_time0_load, TIMER_RELOAD);
++	WR_CPU_REG32(CPU_time0_ctrl, TIMER_ENABLE | TIMER_PERIODIC |
++			TIMER_PRESCALE_512);
++	WR_CPU_REG32(CPU_time0_clr, 1);
++}
++#endif
++
+ /*
+  * Setup Timer0 as the source
+  */
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin --exclude=yamon-02.06-SIGMADESIGNS-01_el.bin linux-2.6.15.ref/drivers/cpufreq/Kconfig linux-2.6.15/drivers/cpufreq/Kconfig
+--- linux-2.6.15.ref/drivers/cpufreq/Kconfig	2006-01-25 20:51:24.000000000 -0800
++++ linux-2.6.15/drivers/cpufreq/Kconfig	2006-11-06 13:43:52.000000000 -0800
+@@ -52,13 +52,14 @@
+ 
+ choice
+ 	prompt "Default CPUFreq governor"
+-	default CPU_FREQ_DEFAULT_GOV_USERSPACE if CPU_FREQ_SA1100 || CPU_FREQ_SA1110
++	default CPU_FREQ_DEFAULT_GOV_USERSPACE if CPU_FREQ_SA1100 || CPU_FREQ_SA1110 || TANGOX_FREQUENCY_SCALING
+ 	default CPU_FREQ_DEFAULT_GOV_PERFORMANCE
+ 	help
+ 	  This option sets which CPUFreq governor shall be loaded at
+ 	  startup. If in doubt, select 'performance'.
+ 
+ config CPU_FREQ_DEFAULT_GOV_PERFORMANCE
++	depends on !TANGOX_FREQUENCY_SCALING
+ 	bool "performance"
+ 	select CPU_FREQ_GOV_PERFORMANCE
+ 	help
+@@ -67,6 +68,7 @@
+ 	  the CPU.
+ 
+ config CPU_FREQ_DEFAULT_GOV_USERSPACE
++	depends on TANGOX_FREQUENCY_SCALING
+ 	bool "userspace"
+ 	select CPU_FREQ_GOV_USERSPACE
+ 	help
+@@ -78,6 +80,7 @@
+ endchoice
+ 
+ config CPU_FREQ_GOV_PERFORMANCE
++	depends on !TANGOX_FREQUENCY_SCALING
+        tristate "'performance' governor"
+        help
+ 	  This cpufreq governor sets the frequency statically to the
+@@ -86,6 +89,7 @@
+ 	  If in doubt, say Y.
+ 
+ config CPU_FREQ_GOV_POWERSAVE
++	depends on !TANGOX_FREQUENCY_SCALING
+        tristate "'powersave' governor"
+        help
+ 	  This cpufreq governor sets the frequency statically to the
+@@ -94,6 +98,7 @@
+ 	  If in doubt, say Y.
+ 
+ config CPU_FREQ_GOV_USERSPACE
++	depends on TANGOX_FREQUENCY_SCALING
+        tristate "'userspace' governor for userspace frequency scaling"
+        help
+ 	  Enable this cpufreq governor when you either want to set the
+@@ -106,6 +111,7 @@
+ 	  If in doubt, say Y.
+ 
+ config CPU_FREQ_GOV_ONDEMAND
++	depends on !TANGOX_FREQUENCY_SCALING
+ 	tristate "'ondemand' cpufreq policy governor"
+ 	help
+ 	  'ondemand' - This driver adds a dynamic cpufreq policy governor.
+@@ -120,6 +126,7 @@
+ 	  If in doubt, say N.
+ 
+ config CPU_FREQ_GOV_CONSERVATIVE
++	depends on !TANGOX_FREQUENCY_SCALING
+ 	tristate "'conservative' cpufreq governor"
+ 	depends on CPU_FREQ
+ 	help
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin --exclude=yamon-02.06-SIGMADESIGNS-01_el.bin linux-2.6.15.ref/README.1013.frequency.patch linux-2.6.15/README.1013.frequency.patch
+--- linux-2.6.15.ref/README.1013.frequency.patch	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.15/README.1013.frequency.patch	2006-11-06 13:45:48.000000000 -0800
+@@ -0,0 +1,20 @@
++Feature:
++--------
++Changing CPU/System frequency is allowed while syncing up the timer.
++CPU/System frequency scaling support.
++
++Prerequisite patch numbers:
++---------------------------
++0000
++1000
++
++Primary author:
++---------------
++YH Lin
++
++Related to which chip version SMP86xx xx=?
++-----------------------------------------
++all
++
++(linux patches) which CONFIG_... are provided:
++----------------------------------------------

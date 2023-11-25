@@ -1,0 +1,17 @@
+config BR2_PACKAGE_GDB_SERVER
+	bool "Build gdb server for the Target"
+	default n
+	help
+	    Build the gdbserver stub to run on the target.
+	    A full gdb is needed to debug the progam.
+
+config BR2_GDB_VERSION_6_3
+	bool 
+#	"gdb 6.3"
+	default y
+
+config BR2_GDB_VERSION
+	string
+	default "6.3"      if BR2_GDB_VERSION_6_3
+
+
